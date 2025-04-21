@@ -1,26 +1,25 @@
 import { useState, useRef } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { Points, PointMaterial, OrbitControls } from '@react-three/drei';
 
-function ThreeDReconstruction() {
-  const [disparityImage, setDisparityImage] = useState(null);
-  const [epipolarImage, setEpipolarImage] = useState(null);
-  const [points3D, setPoints3D] = useState([]);
-  const leftInputRef = useRef(null);
-  const rightInputRef = useRef(null);
+function ImageStitching() {
+  const [matchesImage, setMatchesImage] = useState(null);
+  const [panorama, setPanorama] = useState(null);
+  const [inliers, setInliers] = useState(null);
+  const fileInputRef = useRef(null);
 
   const handleUpload = async () => {
-    if (!leftInputRef.current.files[0] || !rightInputRef.current.files[0]) {
-      alert('Please upload both left and right images!');
+    const files = fileInputRef.current.files;
+    if (files.length < 2) {
+      alert('Please upload at least two images!');
       return;
     }
 
     const formData = new FormData();
-    formData.append('left_image', leftInputRef.current.files[0]);
-    formData.append('right_image', rightInputRef.current.files[0]);
+    for (let i = 0; i < files.length; i++) {
+      formData.append(`image_${i}`, files[i]);
+    }
 
     try {
-      const response = await fetch('http://localhost:5000/reconstruct', {
+      const response = await fetch('http://localhost:5000/stitch', {
         method: 'POST',
         body: formData,
       });
@@ -29,58 +28,44 @@ function ThreeDReconstruction() {
         alert(data.error);
         return;
       }
-      setDisparityImage(`data:image/png;base64,${data.disparity}`);
-      setEpipolarImage(`data:image/png;base64,${data.left_epipolar}`);
-      setPoints3D(data.points_3d);
+      setMatchesImage(`data:image/png;base64,${data.matches}`);
+      setPanorama(`data:image/png;base64,${data.panorama}`);
+      setInliers(data.inliers);
     } catch (error) {
-      console.error('Error reconstructing:', error);
-      alert('Failed to reconstruct');
+      console.error('Error stitching:', error);
+      alert('Failed to stitch images');
     }
   };
 
   return (
     <div className="bg-white p-4 rounded-lg shadow">
-      <h2 className="text-xl font-semibold mb-4">Part B: 3D Reconstruction</h2>
-      <input type="file" accept="image/*" ref={leftInputRef} className="mb-2" />
-      <input type="file" accept="image/*" ref={rightInputRef} className="mb-2" />
+      <h2 className="text-xl font-semibold mb-4">Part C: Image Stitching</h2>
+      <input
+        type="file"
+        accept="image/*"
+        multiple
+        ref={fileInputRef}
+        className="mb-4"
+      />
       <button
         onClick={handleUpload}
         className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
       >
-        Reconstruct
+        Stitch Images
       </button>
       <div className="grid grid-cols-2 gap-2 mt-4">
         <div>
-          <h3 className="text-lg font-medium">Disparity Map</h3>
-          {disparityImage && <img src={disparityImage} alt="Disparity" className="max-w-full h-auto" />}
+          <h3 className="text-lg font-medium">Matched Keypoints</h3>
+          {matchesImage && <img src={matchesImage} alt="Matches" className="max-w-full h-auto" />}
+          {inliers && <p className="mt-2">Inliers: {inliers}</p>}
         </div>
         <div>
-          <h3 className="text-lg font-medium">3D Point Cloud</h3>
-          {points3D.length > 0 && (
-            <Canvas camera={{ position: [0, 0, 5] }} style={{ height: '300px' }}>
-              <Points>
-                <bufferGeometry>
-                  <bufferAttribute
-                    attach="attributes-position"
-                    array={new Float32Array(points3D.flat())}
-                    itemSize={3}
-                    count={points3D.length}
-                  />
-                </bufferGeometry>
-                <PointMaterial size={0.01} color="green" />
-              </Points>
-              <ambientLight />
-              <OrbitControls />
-            </Canvas>
-          )}
+          <h3 className="text-lg font-medium">Panorama</h3>
+          {panorama && <img src={panorama} alt="Panorama" className="max-w-full h-auto" />}
         </div>
-      </div>
-      <div className="mt-4">
-        <h3 className="text-lg font-medium">Left Image with Epipolar Lines</h3>
-        {epipolarImage && <img src={epipolarImage} alt="Epipolar" className="max-w-full h-auto" />}
       </div>
     </div>
   );
 }
 
-export default ThreeDReconstruction;
+export default ImageStitching;
