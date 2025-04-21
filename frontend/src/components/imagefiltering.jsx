@@ -27,7 +27,7 @@ function ImageFiltering() {
     formData.append('filter_type', filterType);
 
     try {
-      const response = await fetch('http://localhost:5000/filter', {
+      const response = await fetch('https://cv-midterm.onrender.com', {
         method: 'POST',
         body: formData,
       });
