@@ -19,7 +19,7 @@ function ImageStitching() {
     }
 
     try {
-      const response = await fetch('https://cv-midterm.onrender.com', {
+      const response = await fetch('http://localhost:5000/stitch', {
         method: 'POST',
         body: formData,
       });

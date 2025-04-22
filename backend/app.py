@@ -7,7 +7,7 @@ from io import BytesIO
 from PIL import Image
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for React frontend
+CORS(app)  
 
 def image_to_base64(img):
     """Convert OpenCV image to base64 string."""
