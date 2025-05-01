@@ -7,7 +7,7 @@ from io import BytesIO
 from PIL import Image
 
 app = Flask(__name__)
-CORS(app)  
+CORS(app)
 
 def image_to_base64(img):
     """Convert OpenCV image to base64 string."""
@@ -57,7 +57,7 @@ def apply_filter():
         'psnr': psnr
     })
 
-@app.route('/reconstruct', methods=['POST'])
+@app.route('/3dconstruction', methods=['POST'])
 def reconstruct():
     if 'left_image' not in request.files or 'right_image' not in request.files:
         return jsonify({'error': 'Two images required'}), 400

@@ -20,7 +20,7 @@ function ThreeDReconstruction() {
     formData.append('right_image', rightInputRef.current.files[0]);
 
     try {
-      const response = await fetch('http://localhost:5000/construct', {
+      const response = await fetch('http://localhost:5000/3dconstruction', {
         method: 'POST',
         body: formData,
       });
