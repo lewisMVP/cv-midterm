@@ -1,15 +1,14 @@
 from flask import Flask, request, jsonify
 import cv2
-import numpy as np
 from PIL import Image
 import io
+import numpy as np
 import base64
 from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": ["http://localhost:5173", "https://lewisMVP.github.io"]}})
 
-# Hàm chuyển đổi ảnh sang base64 để trả về frontend
 def image_to_base64(img):
     _, buffer = cv2.imencode('.png', img)
     return base64.b64encode(buffer).decode('utf-8')
@@ -109,16 +108,23 @@ def reconstruct_3d():
     print(f"R dtype: {R.dtype}, shape: {R.shape}")
     print(f"T dtype: {T.dtype}, shape: {T.shape}")
     
-    # Tính ma trận hiệu chỉnh
+    # Fix type mismatch in stereoRectify
     try:
+        # Make sure all matrices have the same data type
+        camera_matrix = np.array([[focal_length, 0, w/2],
+                                [0, focal_length, h/2],
+                                [0, 0, 1]], dtype=np.float64)  # Change to float64
+        dist_coeffs = np.zeros(5, dtype=np.float64)  # Change to float64
+        R = np.eye(3, dtype=np.float64)  # Change to float64
+        T = np.array([baseline, 0, 0], dtype=np.float64)  # Change to float64
+        
         R1, R2, P1, P2, Q, _, _ = cv2.stereoRectify(
             camera_matrix, dist_coeffs, camera_matrix, dist_coeffs,
             (w, h), R, T, alpha=0
         )
     except cv2.error as e:
         print(f"Stereo rectification failed: {str(e)}")
-        left_rectified = left_gray
-        right_rectified = right_gray
+        # Fallback with consistent data types
         Q = np.float32([[1, 0, 0, -0.5 * w],
                       [0, -1, 0, 0.5 * h],
                       [0, 0, 0, focal_length],
@@ -159,6 +165,17 @@ def reconstruct_3d():
     print(f"Total points before filtering: {points_3d.shape[0]}")
     points_3d = points_3d[np.isfinite(points_3d).all(axis=1)]
     print(f"Total points after filtering: {points_3d.shape[0]}")
+    
+    points_3d = points_3d[np.abs(points_3d[:, 2]) < 10000]  # Filter by Z depth
+    points_3d = points_3d[np.abs(points_3d[:, 0]) < 5000]   # Filter by X coordinate
+    points_3d = points_3d[np.abs(points_3d[:, 1]) < 5000]   # Filter by Y coordinate
+
+    scale_factor = 0.1
+    points_3d = points_3d * scale_factor
+    
+    max_distance = 1000  # Adjust this value
+    points_3d = points_3d[np.sum(points_3d**2, axis=1) < max_distance**2]
+    
     if len(points_3d) > 10000:
         indices = np.random.choice(len(points_3d), 10000, replace=False)
         points_3d = points_3d[indices]

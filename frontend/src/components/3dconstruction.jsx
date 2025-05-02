@@ -1,6 +1,7 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Points, PointMaterial, OrbitControls } from '@react-three/drei';
+import * as THREE from 'three'; // Make sure Three.js is imported
 
 // Component xử lý Part B: 3D Reconstruction
 function ThreeDReconstruction() {
@@ -13,6 +14,55 @@ function ThreeDReconstruction() {
     const [method, setMethod] = useState('StereoBM');  // Thêm state để chọn phương pháp
     const leftInputRef = useRef(null);
     const rightInputRef = useRef(null);
+
+    // Add this function to properly format points for Three.js
+    const PointCloud = ({ points }) => {
+        const pointsRef = useRef();
+        
+        useEffect(() => {
+            if (pointsRef.current && points.length > 0) {
+                // Log for debugging
+                console.log("Updating point cloud with", points.length, "points");
+                
+                // Create a flat Float32Array from the points array
+                const positions = new Float32Array(points.length * 3);
+                for (let i = 0; i < points.length; i++) {
+                    positions[i * 3] = points[i][0];     // x
+                    positions[i * 3 + 1] = points[i][1]; // y
+                    positions[i * 3 + 2] = points[i][2]; // z
+                }
+                
+                // Update the buffer with the new positions
+                pointsRef.current.geometry.setAttribute(
+                    'position', 
+                    new THREE.BufferAttribute(positions, 3)
+                );
+                
+                // Update the geometry
+                pointsRef.current.geometry.computeBoundingSphere();
+            }
+        }, [points]);
+        
+        return (
+            <points ref={pointsRef}>
+                <bufferGeometry>
+                    <bufferAttribute
+                        attach="attributes-position"
+                        count={points.length}
+                        array={new Float32Array(points.flat())}
+                        itemSize={3}
+                    />
+                </bufferGeometry>
+                <pointsMaterial 
+                    size={0.5} 
+                    color="green" 
+                    sizeAttenuation={true} 
+                    transparent={true}
+                    alphaTest={0.5}
+                />
+            </points>
+        );
+    };
 
     // Xử lý khi người dùng upload ảnh và gọi API reconstruct
     const handleUpload = async () => {
@@ -49,6 +99,14 @@ function ThreeDReconstruction() {
         }
     };
 
+    // Debug output
+    useEffect(() => {
+      if (points3D && points3D.length > 0) {
+        console.log("Points for rendering:", points3D.length);
+        console.log("Sample points:", points3D.slice(0, 5));
+      }
+    }, [points3D]);
+
     return (
         <div className="bg-blue-50 p-4 rounded-lg shadow">
             <h2 className="text-xl font-semibold mb-4 text-indigo-800">Part B: 3D Reconstruction</h2>
@@ -79,20 +137,19 @@ function ThreeDReconstruction() {
                 <div>
                     <h3 className="text-lg font-medium text-gray-700">3D Point Cloud</h3>
                     {points3D.length > 0 ? (
-                        <Canvas camera={{ position: [0, 0, 50], fov: 75 }} style={{ height: '300px' }}>
-                            <Points>
-                                <bufferGeometry>
-                                    <bufferAttribute
-                                        attach="attributes-position"
-                                        array={new Float32Array(points3D.flat())}
-                                        itemSize={3}
-                                        count={points3D.length}
-                                    />
-                                </bufferGeometry>
-                                <PointMaterial size={0.05} color="green" />
-                            </Points>
+                        <Canvas
+                            camera={{ position: [0, 0, 50], far: 10000 }}
+                            style={{ height: '400px', backgroundColor: '#111' }}
+                        >
                             <ambientLight intensity={0.5} />
-                            <OrbitControls />
+                            <pointLight position={[10, 10, 10]} />
+                            <PointCloud points={points3D} />
+                            <OrbitControls 
+                                enableDamping 
+                                dampingFactor={0.25}
+                                rotateSpeed={0.5}
+                                zoomSpeed={0.8}
+                            />
                         </Canvas>
                     ) : (
                         <p className="text-red-500">No 3D points to render. The disparity map may contain too much noise, or the images need better rectification.</p>
