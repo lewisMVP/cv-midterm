@@ -61,10 +61,15 @@ function ImageFiltering() {
                 onChange={handleImageUpload}
                 className="mb-4"
             />
-            <div className="flex space-x-2 mb-4">
-                <button onClick={applyFilters}>Apply All Filters</button>
+            <div>
+                <button 
+                    onClick={applyFilters}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                >
+                    Apply all Filters
+                </button>
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-2 mt-4">
                 <div>
                     <h3 className="text-lg font-medium text-gray-700">Original Image</h3>
                     {originalImage && <img src={originalImage} alt="Original" className="max-w-full h-auto" />}

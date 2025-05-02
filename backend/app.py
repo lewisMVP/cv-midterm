@@ -268,101 +268,234 @@ def reconstruct_3d():
 
 # Part C: Image Stitching
 def stitch_two_images(img1, img2):
+    # Đảm bảo ảnh cùng kiểu dữ liệu và kích thước phù hợp
+    img1 = cv2.resize(img1, (0, 0), fx=1.0, fy=1.0)
+    img2 = cv2.resize(img2, (0, 0), fx=1.0, fy=1.0)
+    
     # Chuyển ảnh sang grayscale
     gray1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
     gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
     
-    # Phát hiện và mô tả đặc trưng bằng ORB
-    orb = cv2.ORB_create()
-    kp1, des1 = orb.detectAndCompute(gray1, None)
-    kp2, des2 = orb.detectAndCompute(gray2, None)
-    
-    # Khớp đặc trưng
-    bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-    matches = bf.match(des1, des2)
-    matches = sorted(matches, key=lambda x: x.distance)
+    # Sử dụng SIFT thay vì ORB để có kết quả tốt hơn
+    # Nếu SIFT không có sẵn, sử dụng ORB với số lượng features cao hơn
+    try:
+        sift = cv2.SIFT_create()
+        kp1, des1 = sift.detectAndCompute(gray1, None)
+        kp2, des2 = sift.detectAndCompute(gray2, None)
+        
+        # FLANN matcher hoạt động tốt hơn với SIFT
+        FLANN_INDEX_KDTREE = 1
+        index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
+        search_params = dict(checks=50)
+        flann = cv2.FlannBasedMatcher(index_params, search_params)
+        matches = flann.knnMatch(des1, des2, k=2)
+        
+        # Lọc matches tốt bằng Lowe's ratio test
+        good_matches = []
+        for m, n in matches:
+            if m.distance < 0.7 * n.distance:
+                good_matches.append(m)
+    except:
+        # Fallback sang ORB nếu SIFT không có sẵn
+        orb = cv2.ORB_create(nfeatures=3000)
+        kp1, des1 = orb.detectAndCompute(gray1, None)
+        kp2, des2 = orb.detectAndCompute(gray2, None)
+        
+        # Brute force matcher cho ORB
+        bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+        good_matches = bf.match(des1, des2)
+        good_matches = sorted(good_matches, key=lambda x: x.distance)[:100]  # Lấy top 100 matches
     
     # Vẽ matched keypoints
-    matches_img = cv2.drawMatches(img1, kp1, img2, kp2, matches[:10], None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+    matches_img = cv2.drawMatches(img1, kp1, img2, kp2, good_matches[:20], None, 
+                                 flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+    
+    # Ước lượng homography nếu có đủ matches
+    if len(good_matches) < 10:
+        print(f"Warning: Not enough good matches ({len(good_matches)}). Skipping stitching.")
+        return img2, matches_img, 0
     
     # Ước lượng homography
-    src_pts = np.float32([kp1[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
-    dst_pts = np.float32([kp2[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
-    H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
+    src_pts = np.float32([kp1[m.queryIdx].pt for m in good_matches]).reshape(-1, 1, 2)
+    dst_pts = np.float32([kp2[m.trainIdx].pt for m in good_matches]).reshape(-1, 1, 2)
+    
+    # Thử RANSAC với nhiều iteration hơn và threshold phù hợp hơn
+    H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 3.0, maxIters=10000)
     inliers = int(np.sum(mask))
     
-    # Kiểm tra chất lượng homography
-    if inliers < 50:  # Nếu số lượng inliers quá thấp, trả về ảnh gốc
-        print(f"Warning: Low inliers ({inliers}). Skipping stitching for this pair.")
+    # Kiểm tra chất lượng homography (giảm ngưỡng xuống)
+    min_inliers = min(30, len(good_matches) // 4)  # Điều chỉnh ngưỡng dựa vào số matches
+    if inliers < min_inliers or H is None:
+        print(f"Warning: Low quality homography ({inliers} inliers). Skipping stitching.")
         return img2, matches_img, inliers
     
-    # Ghép ảnh
+    # Tính kích thước canvas cho ảnh ghép
     h1, w1 = img1.shape[:2]
     h2, w2 = img2.shape[:2]
     
-    # Tính kích thước canvas lớn hơn để chứa toàn bộ ảnh sau khi warp
-    # Warp img1 để lấy các điểm biên
+    # Tính toán kích thước và vị trí canvas
     corners1 = np.float32([[0, 0], [0, h1], [w1, h1], [w1, 0]]).reshape(-1, 1, 2)
     corners2 = np.float32([[0, 0], [0, h2], [w2, h2], [w2, 0]]).reshape(-1, 1, 2)
+    
+    # Biến đổi góc của ảnh 1 theo homography
     warped_corners = cv2.perspectiveTransform(corners1, H)
+    
+    # Kết hợp tất cả các góc để tìm kích thước tối đa
     all_corners = np.concatenate((warped_corners, corners2), axis=0)
     
-    # Tìm giới hạn của canvas
-    x_min, y_min = np.int32(all_corners.min(axis=0).ravel())
-    x_max, y_max = np.int32(all_corners.max(axis=0).ravel())
+    # Tìm giới hạn canvas
+    x_min, y_min = np.int32(all_corners.min(axis=0).ravel() - 0.5)
+    x_max, y_max = np.int32(all_corners.max(axis=0).ravel() + 0.5)
+    
+    # Đảm bảo kích thước hợp lý
     width = x_max - x_min
     height = y_max - y_min
     
-    # Tạo ma trận dịch chuyển để đưa ảnh về vùng dương
-    translation = np.array([[1, 0, -x_min], [0, 1, -y_min], [0, 0, 1]], dtype=np.float32)
-    H = translation @ H
+    if width <= 0 or height <= 0 or width > 10000 or height > 10000:
+        print(f"Warning: Invalid dimensions ({width}x{height}). Skipping stitching.")
+        return img2, matches_img, inliers
     
-    # Warp img1
-    result = cv2.warpPerspective(img1, H, (width, height))
+    # Ma trận dịch chuyển để đưa về vùng dương
+    translation = np.array([[1, 0, -x_min], [0, 1, -y_min], [0, 0, 1]], dtype=np.float64)
+    H_adjusted = translation @ H
     
-    # Tạo mask cho img2
-    img2_translated = np.zeros_like(result)
-    img2_translated[-y_min:-y_min+h2, -x_min:-x_min+w2] = img2
+    # Tạo ảnh warp từ ảnh 1
+    warped_img = cv2.warpPerspective(img1, H_adjusted, (width, height))
     
-    # Tạo mask để blending
-    mask1 = np.zeros((height, width), dtype=np.float32)
-    mask2 = np.zeros((height, width), dtype=np.float32)
-    mask1 = cv2.warpPerspective(np.ones((h1, w1), dtype=np.float32), H, (width, height))
-    mask2[-y_min:-y_min+h2, -x_min:-x_min+w2] = 1.0
+    # Tạo mask cho vùng warp
+    mask1 = cv2.warpPerspective(np.ones((h1, w1), dtype=np.uint8), H_adjusted, (width, height))
     
-    # Alpha blending đơn giản
-    alpha = 0.5
-    result = result * mask1[:, :, None] * alpha + img2_translated * mask2[:, :, None] * (1 - alpha)
-    result = np.clip(result, 0, 255).astype(np.uint8)
+    # Tạo canvas cho ảnh kết quả
+    result = np.zeros((height, width, 3), dtype=np.uint8)
     
-    print(f"Result shape after stitching: {result.shape}")
+    # Đặt ảnh 2 vào vị trí thích hợp trong canvas
+    y_offset = max(0, -y_min)
+    x_offset = max(0, -x_min)
+    
+    # Đảm bảo không vượt quá kích thước
+    y_end = min(height, y_offset + h2)
+    x_end = min(width, x_offset + w2)
+    y2_end = min(h2, y_end - y_offset)
+    x2_end = min(w2, x_end - x_offset)
+    
+    # Chèn ảnh 2 vào vị trí thích hợp
+    result[y_offset:y_offset + y2_end, x_offset:x_offset + x2_end] = img2[:y2_end, :x2_end]
+    
+    # Tạo mask cho ảnh 2
+    mask2 = np.zeros((height, width), dtype=np.uint8)
+    mask2[y_offset:y_offset + y2_end, x_offset:x_offset + x2_end] = 1
+    
+    # Tính vùng chồng lấp
+    overlap_mask = mask1 & mask2
+    
+    # Tạo gradient mask cho vùng chồng lấp để blend mượt hơn
+    if np.sum(overlap_mask) > 0:
+        # Tạo gradient mask từ trái sang phải trong vùng chồng lấp
+        y_indices, x_indices = np.where(overlap_mask > 0)
+        left_edge = np.min(x_indices)
+        right_edge = np.max(x_indices)
+        
+        # Tạo gradient từ 0 đến 1 trong vùng chồng lấp
+        width_overlap = right_edge - left_edge + 1
+        if width_overlap > 1:  # Tránh chia cho 0
+            for x in range(left_edge, right_edge + 1):
+                # Tạo gradient từ 0->1 theo chiều từ trái sang phải
+                alpha = (x - left_edge) / (width_overlap - 1)
+                # Áp dụng gradient chỉ trong vùng chồng lấp tại cột x
+                col_overlap = overlap_mask[:, x].astype(bool)
+                
+                # Áp dụng alpha blending với gradient
+                result[col_overlap, x, :] = (
+                    (1 - alpha) * result[col_overlap, x, :] + 
+                    alpha * warped_img[col_overlap, x, :]
+                ).astype(np.uint8)
+        
+        # Áp dụng warped image ở những vùng không chồng lấp với ảnh 2
+        non_overlap_warped = (mask1 > 0) & (mask2 == 0)
+        result[non_overlap_warped] = warped_img[non_overlap_warped]
+    else:
+        # Nếu không có vùng chồng lấp, kết hợp cả hai ảnh
+        result = np.where(mask2[:, :, np.newaxis] > 0, result, warped_img)
+    
     return result, matches_img, inliers
 
 @app.route('/stitch', methods=['POST'])
 def stitch_images():
     files = request.files
-    if len(files) < 4:  # Yêu cầu ít nhất 4 ảnh
-        return jsonify({'error': 'At least four images are required'}), 400
+    if len(files) < 2:  # Cần ít nhất 2 ảnh
+        return jsonify({'error': 'At least two images are required'}), 400
     
+    # Đọc và xử lý các ảnh
     images = []
-    for key in files:
+    for key in sorted(files.keys()):  # Sắp xếp theo thứ tự key
         file = files[key]
-        img = np.array(Image.open(file))
-        if len(img.shape) == 3 and img.shape[2] == 4:
-            img = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
-        elif len(img.shape) == 3:
-            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-        images.append(img)
+        try:
+            img = np.array(Image.open(file))
+            if len(img.shape) == 3 and img.shape[2] == 4:
+                img = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
+            elif len(img.shape) == 3 and img.shape[2] == 3:
+                img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+            elif len(img.shape) == 2:  # Grayscale
+                img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+            else:
+                return jsonify({'error': f'Unsupported image format for {key}'}), 400
+            
+            # Resize ảnh nếu quá lớn để tăng hiệu suất
+            h, w = img.shape[:2]
+            if max(h, w) > 1200:
+                scale = 1200 / max(h, w)
+                img = cv2.resize(img, None, fx=scale, fy=scale)
+            
+            images.append(img)
+        except Exception as e:
+            return jsonify({'error': f'Failed to process image {key}: {str(e)}'}), 400
     
-    # Ghép tuần tự 4 ảnh
-    result, matches_img, inliers = stitch_two_images(images[0], images[1])
-    for i in range(2, 4):
-        result, _, _ = stitch_two_images(result, images[i])
+    if len(images) < 2:
+        return jsonify({'error': 'At least two valid images are required'}), 400
+    
+    # Ghép tuần tự từ ảnh đầu tiên
+    result = images[0]
+    matches_img = None  # Lưu kết quả của cặp ghép đầu tiên để hiển thị
+    all_inliers = []
+    
+    try:
+        # Thử ghép từng cặp ảnh liên tiếp
+        for i in range(1, len(images)):
+            temp_result, current_matches_img, inliers = stitch_two_images(result, images[i])
+            
+            # Lưu lại ảnh matches của cặp đầu tiên (thường quan trọng nhất)
+            if i == 1:
+                matches_img = current_matches_img
+            
+            result = temp_result
+            all_inliers.append(inliers)
+            
+            # Log thông tin để debug
+            print(f"Stitched image pair {i-1}-{i}, inliers: {inliers}")
+    except Exception as e:
+        print(f"Error during stitching: {str(e)}")
+        # Trả về lỗi nhưng vẫn gửi kết quả trung gian nếu có
+        if matches_img is None:
+            return jsonify({'error': f'Stitching failed: {str(e)}'}), 500
+    
+    # Đảm bảo rằng luôn có ảnh matches để trả về
+    if matches_img is None and len(images) >= 2:
+        # Nếu không có ảnh matches, tạo một ảnh matches đơn giản giữa hai ảnh đầu tiên
+        orb = cv2.ORB_create()
+        gray1 = cv2.cvtColor(images[0], cv2.COLOR_BGR2GRAY)
+        gray2 = cv2.cvtColor(images[1], cv2.COLOR_BGR2GRAY)
+        kp1, des1 = orb.detectAndCompute(gray1, None)
+        kp2, des2 = orb.detectAndCompute(gray2, None)
+        bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+        matches = bf.match(des1, des2)
+        matches = sorted(matches, key=lambda x: x.distance)[:10]
+        matches_img = cv2.drawMatches(images[0], kp1, images[1], kp2, matches, None, 
+                                    flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
     
     return jsonify({
         'matches': image_to_base64(matches_img),
         'panorama': image_to_base64(result),
-        'inliers': inliers
+        'inliers': all_inliers
     })
 
 if __name__ == '__main__':
