@@ -163,22 +163,67 @@ def reconstruct_3d():
     points_3d = cv2.reprojectImageTo3D(disparity, Q)
     points_3d = points_3d.reshape(-1, 3)
     print(f"Total points before filtering: {points_3d.shape[0]}")
-    points_3d = points_3d[np.isfinite(points_3d).all(axis=1)]
-    print(f"Total points after filtering: {points_3d.shape[0]}")
-    
-    points_3d = points_3d[np.abs(points_3d[:, 2]) < 10000]  # Filter by Z depth
-    points_3d = points_3d[np.abs(points_3d[:, 0]) < 5000]   # Filter by X coordinate
-    points_3d = points_3d[np.abs(points_3d[:, 1]) < 5000]   # Filter by Y coordinate
 
-    scale_factor = 0.1
+    # Filter out invalid points
+    points_3d = points_3d[np.isfinite(points_3d).all(axis=1)]
+    print(f"Points after removing non-finite values: {points_3d.shape[0]}")
+
+    # Use percentile-based filtering to preserve structure
+    z_vals = points_3d[:, 2]
+    x_vals = points_3d[:, 0]
+    y_vals = points_3d[:, 1]
+
+    # Remove extreme outliers (1st and 99th percentiles)
+    z_min, z_max = np.percentile(z_vals, [1, 99])
+    x_min, x_max = np.percentile(x_vals, [1, 99])
+    y_min, y_max = np.percentile(y_vals, [1, 99])
+
+    # Apply filters
+    mask = (z_vals > z_min) & (z_vals < z_max)
+    mask &= (x_vals > x_min) & (x_vals < x_max)
+    mask &= (y_vals > y_min) & (y_vals < y_max)
+    points_3d = points_3d[mask]
+    print(f"Points after percentile filtering: {points_3d.shape[0]}")
+
+    # Apply better scale factor depending on the range of values
+    z_range = np.max(np.abs(points_3d[:, 2]))
+    scale_factor = 10.0 / (z_range + 1e-6)  # Adaptive scaling
     points_3d = points_3d * scale_factor
-    
-    max_distance = 1000  # Adjust this value
+    print(f"Applied scale factor: {scale_factor}")
+
+    # Ensure points are within reasonable bounds for visualization
+    max_distance = 20.0  # Keep within reasonable bounds for Three.js
     points_3d = points_3d[np.sum(points_3d**2, axis=1) < max_distance**2]
-    
+    print(f"Points after distance filtering: {points_3d.shape[0]}")
+
+    # Downsample if necessary to maintain performance
     if len(points_3d) > 10000:
-        indices = np.random.choice(len(points_3d), 10000, replace=False)
-        points_3d = points_3d[indices]
+        # Use stratified sampling based on depth to maintain structure
+        n_bins = 20
+        z_bins = np.linspace(points_3d[:, 2].min(), points_3d[:, 2].max(), n_bins)
+        sampled_points = []
+        
+        for i in range(n_bins-1):
+            bin_mask = (points_3d[:, 2] >= z_bins[i]) & (points_3d[:, 2] < z_bins[i+1])
+            bin_points = points_3d[bin_mask]
+            
+            if len(bin_points) > 0:
+                # Sample proportionally to bin size with minimum of 10 points per bin
+                bin_samples = max(10, int(10000 * len(bin_points) / len(points_3d)))
+                indices = np.random.choice(len(bin_points), min(bin_samples, len(bin_points)), replace=False)
+                sampled_points.append(bin_points[indices])
+        
+        if sampled_points:
+            points_3d = np.vstack(sampled_points)
+            
+        # If stratified sampling failed, fall back to random sampling
+        if len(points_3d) > 10000:
+            indices = np.random.choice(len(points_3d), 10000, replace=False)
+            points_3d = points_3d[indices]
+
+    print(f"Final point cloud size: {points_3d.shape[0]} points")
+
+    # Send as list
     points_3d = points_3d.tolist()
     
     # Tính ma trận cơ bản và đường epipolar
