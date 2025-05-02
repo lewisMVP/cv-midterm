@@ -1,153 +1,306 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS
 import cv2
 import numpy as np
-import base64
-from io import BytesIO
 from PIL import Image
+import io
+import base64
+from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": ["http://localhost:5173", "https://lewisMVP.github.io"]}})
 
+# Hàm chuyển đổi ảnh sang base64 để trả về frontend
 def image_to_base64(img):
-    """Convert OpenCV image to base64 string."""
     _, buffer = cv2.imencode('.png', img)
-    img_base64 = base64.b64encode(buffer).decode('utf-8')
-    return img_base64
+    return base64.b64encode(buffer).decode('utf-8')
 
+# Part A: Image Filtering
 @app.route('/filter', methods=['POST'])
-def apply_filter():
+def filter_image():
+    # Kiểm tra input
     if 'image' not in request.files:
         return jsonify({'error': 'No image provided'}), 400
     
     file = request.files['image']
-    filter_type = request.form.get('filter_type', 'mean')
-    
-    # Read image
     img = np.array(Image.open(file))
-    if img.shape[2] == 4:  # Convert RGBA to RGB
-        img = cv2.cvtColor(img, cv2.COLOR_RGBA2RGB)
-    else:
+    
+    # Chuyển đổi ảnh sang định dạng phù hợp (BGR)
+    if len(img.shape) == 3 and img.shape[2] == 4:
+        img = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
+    elif len(img.shape) == 3:
         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
     
-    # Apply filter
-    if filter_type == 'mean':
-        filtered = cv2.blur(img, (5, 5))
-    elif filter_type == 'gaussian':
-        filtered = cv2.GaussianBlur(img, (5, 5), 0)
-    elif filter_type == 'median':
-        filtered = cv2.medianBlur(img, 5)
-    elif filter_type == 'laplacian':
-        laplacian = cv2.Laplacian(img, cv2.CV_64F)
-        filtered = cv2.convertScaleAbs(laplacian)
-    else:
-        return jsonify({'error': 'Invalid filter type'}), 400
+    # Tạo ảnh nhiễu (Gaussian noise)
+    noise = np.random.normal(0, 25, img.shape).astype(np.uint8)
+    noisy_img = cv2.add(img, noise)
     
-    # Convert images to base64
-    original_base64 = image_to_base64(img)
-    filtered_base64 = image_to_base64(filtered)
+    # Áp dụng tất cả bộ lọc
+    filters = {
+        'mean': cv2.blur(noisy_img, (5, 5)),
+        'gaussian': cv2.GaussianBlur(noisy_img, (5, 5), 0),
+        'median': cv2.medianBlur(noisy_img, 5),
+        'laplacian': cv2.convertScaleAbs(cv2.Laplacian(noisy_img, cv2.CV_64F))
+    }
     
-    # Compute PSNR for comparison
-    mse = np.mean((img.astype(float) - filtered.astype(float)) ** 2)
-    psnr = 10 * np.log10((255 ** 2) / mse) if mse > 0 else float('inf')
+    # Tính PSNR cho từng bộ lọc để so sánh hiệu quả giảm nhiễu
+    psnr_values = {}
+    for key, filtered in filters.items():
+        mse = np.mean((img - filtered) ** 2)
+        if mse == 0:
+            psnr_values[key] = 100
+        else:
+            max_pixel = 255.0
+            psnr_values[key] = 20 * np.log10(max_pixel / np.sqrt(mse))
     
     return jsonify({
-        'original': original_base64,
-        'filtered': filtered_base64,
-        'psnr': psnr
+        'original': image_to_base64(img),
+        'noisy': image_to_base64(noisy_img),
+        'filtered': {key: image_to_base64(img) for key, img in filters.items()},
+        'psnr': psnr_values
     })
 
+# Part B: 3D Reconstruction
 @app.route('/3dconstruction', methods=['POST'])
-def reconstruct():
+def reconstruct_3d():
+    # Kiểm tra input
     if 'left_image' not in request.files or 'right_image' not in request.files:
-        return jsonify({'error': 'Two images required'}), 400
+        return jsonify({'error': 'Both left and right images are required'}), 400
     
     left_file = request.files['left_image']
     right_file = request.files['right_image']
+    num_disparities = int(request.form.get('num_disparities', 64))  # Lấy tham số từ frontend
+    method = request.form.get('method', 'StereoBM')  # Lấy phương pháp (StereoBM hoặc StereoSGBM)
+
+    # Đọc ảnh bằng OpenCV để hỗ trợ PGM
+    left_img = cv2.imdecode(np.frombuffer(left_file.read(), np.uint8), cv2.IMREAD_GRAYSCALE)
+    right_img = cv2.imdecode(np.frombuffer(right_file.read(), np.uint8), cv2.IMREAD_GRAYSCALE)
     
-    # Read images
-    left_img = cv2.imdecode(np.frombuffer(left_file.read(), np.uint8), cv2.IMREAD_COLOR)
-    right_img = cv2.imdecode(np.frombuffer(right_file.read(), np.uint8), cv2.IMREAD_COLOR)
-    left_gray = cv2.cvtColor(left_img, cv2.COLOR_BGR2GRAY)
-    right_gray = cv2.cvtColor(right_img, cv2.COLOR_BGR2GRAY)
+    if left_img is None or right_img is None:
+        return jsonify({'error': 'Failed to read images. Ensure they are valid image files (JPEG, PNG, or PGM)'}), 400
     
-    # Compute disparity
-    stereo = cv2.StereoBM_create(numDisparities=16, blockSize=15)
-    disparity = stereo.compute(left_gray, right_gray)
+    # Kiểm tra kích thước ảnh
+    if left_img.shape != right_img.shape:
+        return jsonify({'error': 'Left and right images must have the same dimensions'}), 400
+
+    # Kiểm tra kích thước hợp lệ
+    h, w = left_img.shape
+    if h <= 0 or w <= 0:
+        return jsonify({'error': 'Invalid image dimensions'}), 400
+
+    # Chuyển ảnh grayscale thành BGR để hiển thị
+    left_img_bgr = cv2.cvtColor(left_img, cv2.COLOR_GRAY2BGR)
+    right_img_bgr = cv2.cvtColor(right_img, cv2.COLOR_GRAY2BGR)
+    left_gray = left_img
+    right_gray = right_img
+    
+    # Hiệu chỉnh ảnh (rectification) - Giả định thông số camera đơn giản
+    focal_length = 600.0
+    baseline = 80.0
+    camera_matrix = np.array([[focal_length, 0, w/2],
+                              [0, focal_length, h/2],
+                              [0, 0, 1]], dtype=np.float32)
+    dist_coeffs = np.zeros(5, dtype=np.float32)
+    R = np.eye(3, dtype=np.float32)
+    T = np.array([baseline, 0, 0], dtype=np.float32)
+    
+    # Debug: Kiểm tra kiểu dữ liệu và kích thước của các ma trận
+    print(f"camera_matrix dtype: {camera_matrix.dtype}, shape: {camera_matrix.shape}")
+    print(f"dist_coeffs dtype: {dist_coeffs.dtype}, shape: {dist_coeffs.shape}")
+    print(f"R dtype: {R.dtype}, shape: {R.shape}")
+    print(f"T dtype: {T.dtype}, shape: {T.shape}")
+    
+    # Tính ma trận hiệu chỉnh
+    try:
+        R1, R2, P1, P2, Q, _, _ = cv2.stereoRectify(
+            camera_matrix, dist_coeffs, camera_matrix, dist_coeffs,
+            (w, h), R, T, alpha=0
+        )
+    except cv2.error as e:
+        print(f"Stereo rectification failed: {str(e)}")
+        left_rectified = left_gray
+        right_rectified = right_gray
+        Q = np.float32([[1, 0, 0, -0.5 * w],
+                      [0, -1, 0, 0.5 * h],
+                      [0, 0, 0, focal_length],
+                      [0, 0, -1/baseline, 0]])
+    else:
+        # Tạo bản đồ ánh xạ để hiệu chỉnh ảnh
+        map1x, map1y = cv2.initUndistortRectifyMap(camera_matrix, dist_coeffs, R1, P1, (w, h), cv2.CV_32FC1)
+        map2x, map2y = cv2.initUndistortRectifyMap(camera_matrix, dist_coeffs, R2, P2, (w, h), cv2.CV_32FC1)
+        
+        # Hiệu chỉnh ảnh
+        left_rectified = cv2.remap(left_gray, map1x, map1y, cv2.INTER_LINEAR)
+        right_rectified = cv2.remap(right_gray, map2x, map2y, cv2.INTER_LINEAR)
+    
+    # Tính bản đồ disparity
+    if method == 'StereoSGBM':
+        stereo = cv2.StereoSGBM_create(
+            minDisparity=-16,
+            numDisparities=num_disparities,
+            blockSize=3,
+            P1=8 * 3 * 3 ** 2,
+            P2=32 * 3 * 3 ** 2,
+            disp12MaxDiff=1,
+            uniquenessRatio=10,
+            speckleWindowSize=150,
+            speckleRange=64
+        )
+    else:
+        stereo = cv2.StereoBM_create(numDisparities=num_disparities, blockSize=5)
+    
+    disparity = stereo.compute(left_rectified, right_rectified)
+    disparity = cv2.filterSpeckles(disparity, 0, 4000, num_disparities)[0]
+    print(f"Disparity min: {disparity.min()}, max: {disparity.max()}, mean: {disparity.mean()}")
     disp_vis = cv2.normalize(disparity, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
     
-    # 3D reconstruction (assume Q matrix)
-    Q = np.float32([[1, 0, 0, -320], [0, 1, 0, -240], [0, 0, 0, 1000], [0, 0, -1, 0]])
+    # Tái tạo điểm 3D
     points_3d = cv2.reprojectImageTo3D(disparity, Q)
-    mask = (disparity > disparity.min()) & (np.isfinite(points_3d).all(axis=2))
-    points_3d = points_3d[mask].reshape(-1, 3).tolist()
+    points_3d = points_3d.reshape(-1, 3)
+    print(f"Total points before filtering: {points_3d.shape[0]}")
+    points_3d = points_3d[np.isfinite(points_3d).all(axis=1)]
+    print(f"Total points after filtering: {points_3d.shape[0]}")
+    if len(points_3d) > 10000:
+        indices = np.random.choice(len(points_3d), 10000, replace=False)
+        points_3d = points_3d[indices]
+    points_3d = points_3d.tolist()
     
-    # Compute fundamental matrix and epipolar lines
+    # Tính ma trận cơ bản và đường epipolar
     orb = cv2.ORB_create()
     kp1, des1 = orb.detectAndCompute(left_gray, None)
     kp2, des2 = orb.detectAndCompute(right_gray, None)
     bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-    matches = bf.match(des1, des2)[:50]
-    pts1 = np.float32([kp1[m.queryIdx].pt for m in matches])
-    pts2 = np.float32([kp2[m.trainIdx].pt for m in matches])
+    matches = bf.match(des1, des2)
+    matches = sorted(matches, key=lambda x: x.distance)[:10]
+    pts1 = np.float32([kp1[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
+    pts2 = np.float32([kp2[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
     F, _ = cv2.findFundamentalMat(pts1, pts2, cv2.FM_RANSAC)
     
-    # Draw epipolar lines
-    lines1 = cv2.computeCorrespondEpilines(pts2.reshape(-1, 1, 2), 2, F).reshape(-1, 3)
-    left_epi = left_img.copy()
-    for line in lines1[:10]:
-        x0, y0 = 0, int(-line[2] / line[1])
-        x1, y1 = left_img.shape[1], int(-(line[2] + line[0] * left_img.shape[1]) / line[1])
-        cv2.line(left_epi, (x0, y0), (x1, y1), (0, 255, 0), 1)
+    # Vẽ đường epipolar trên ảnh trái
+    lines1 = cv2.computeCorrespondEpilines(pts2.reshape(-1, 1, 2), 2, F)
+    lines1 = lines1.reshape(-1, 3)
+    left_epipolar = left_img_bgr.copy()
+    for line, pt in zip(lines1, pts1):
+        color = tuple(np.random.randint(0, 255, 3).tolist())
+        x0, y0 = map(int, [0, -line[2] / line[1]])
+        x1, y1 = map(int, [left_img.shape[1], -(line[2] + line[0] * left_img.shape[1]) / line[1]])
+        cv2.line(left_epipolar, (x0, y0), (x1, y1), color, 1)
+        cv2.circle(left_epipolar, tuple(map(int, pt[0])), 5, color, -1)
+    
+    # Vẽ đường epipolar trên ảnh phải
+    lines2 = cv2.computeCorrespondEpilines(pts1.reshape(-1, 1, 2), 1, F)
+    lines2 = lines2.reshape(-1, 3)
+    right_epipolar = right_img_bgr.copy()
+    for line, pt in zip(lines2, pts2):
+        color = tuple(np.random.randint(0, 255, 3).tolist())
+        x0, y0 = map(int, [0, -line[2] / line[1]])
+        x1, y1 = map(int, [right_img.shape[1], -(line[2] + line[0] * right_img.shape[1]) / line[1]])
+        cv2.line(right_epipolar, (x0, y0), (x1, y1), color, 1)
+        cv2.circle(right_epipolar, tuple(map(int, pt[0])), 5, color, -1)
     
     return jsonify({
         'disparity': image_to_base64(disp_vis),
-        'points_3d': points_3d[:1000],  # Limit for performance
-        'left_epipolar': image_to_base64(left_epi)
+        'points_3d': points_3d,
+        'left_epipolar': image_to_base64(left_epipolar),
+        'right_epipolar': image_to_base64(right_epipolar)
     })
 
-@app.route('/stitch', methods=['POST'])
-def stitch():
-    if len(request.files) < 2:
-        return jsonify({'error': 'At least two images required'}), 400
-    
-    images = []
-    for key in request.files:
-        img = cv2.imdecode(np.frombuffer(request.files[key].read(), np.uint8), cv2.IMREAD_COLOR)
-        images.append(img)
-    
-    # Stitch first two images for simplicity
-    img1, img2 = images[:2]
+# Part C: Image Stitching
+def stitch_two_images(img1, img2):
+    # Chuyển ảnh sang grayscale
     gray1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
     gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
     
-    # Detect and match features
+    # Phát hiện và mô tả đặc trưng bằng ORB
     orb = cv2.ORB_create()
     kp1, des1 = orb.detectAndCompute(gray1, None)
     kp2, des2 = orb.detectAndCompute(gray2, None)
+    
+    # Khớp đặc trưng
     bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
     matches = bf.match(des1, des2)
-    matches = sorted(matches, key=lambda x: x.distance)[:50]
+    matches = sorted(matches, key=lambda x: x.distance)
     
-    # Draw matches
-    match_img = cv2.drawMatches(img1, kp1, img2, kp2, matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+    # Vẽ matched keypoints
+    matches_img = cv2.drawMatches(img1, kp1, img2, kp2, matches[:10], None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
     
-    # Estimate homography
+    # Ước lượng homography
     src_pts = np.float32([kp1[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
     dst_pts = np.float32([kp2[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
     H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
-    inliers = np.sum(mask)
+    inliers = int(np.sum(mask))
     
-    # Warp and blend
+    # Kiểm tra chất lượng homography
+    if inliers < 50:  # Nếu số lượng inliers quá thấp, trả về ảnh gốc
+        print(f"Warning: Low inliers ({inliers}). Skipping stitching for this pair.")
+        return img2, matches_img, inliers
+    
+    # Ghép ảnh
     h1, w1 = img1.shape[:2]
     h2, w2 = img2.shape[:2]
-    result = cv2.warpPerspective(img1, H, (w1 + w2, max(h1, h2)))
-    result[0:h2, 0:w2] = img2  # Simple blending
+    
+    # Tính kích thước canvas lớn hơn để chứa toàn bộ ảnh sau khi warp
+    # Warp img1 để lấy các điểm biên
+    corners1 = np.float32([[0, 0], [0, h1], [w1, h1], [w1, 0]]).reshape(-1, 1, 2)
+    corners2 = np.float32([[0, 0], [0, h2], [w2, h2], [w2, 0]]).reshape(-1, 1, 2)
+    warped_corners = cv2.perspectiveTransform(corners1, H)
+    all_corners = np.concatenate((warped_corners, corners2), axis=0)
+    
+    # Tìm giới hạn của canvas
+    x_min, y_min = np.int32(all_corners.min(axis=0).ravel())
+    x_max, y_max = np.int32(all_corners.max(axis=0).ravel())
+    width = x_max - x_min
+    height = y_max - y_min
+    
+    # Tạo ma trận dịch chuyển để đưa ảnh về vùng dương
+    translation = np.array([[1, 0, -x_min], [0, 1, -y_min], [0, 0, 1]], dtype=np.float32)
+    H = translation @ H
+    
+    # Warp img1
+    result = cv2.warpPerspective(img1, H, (width, height))
+    
+    # Tạo mask cho img2
+    img2_translated = np.zeros_like(result)
+    img2_translated[-y_min:-y_min+h2, -x_min:-x_min+w2] = img2
+    
+    # Tạo mask để blending
+    mask1 = np.zeros((height, width), dtype=np.float32)
+    mask2 = np.zeros((height, width), dtype=np.float32)
+    mask1 = cv2.warpPerspective(np.ones((h1, w1), dtype=np.float32), H, (width, height))
+    mask2[-y_min:-y_min+h2, -x_min:-x_min+w2] = 1.0
+    
+    # Alpha blending đơn giản
+    alpha = 0.5
+    result = result * mask1[:, :, None] * alpha + img2_translated * mask2[:, :, None] * (1 - alpha)
+    result = np.clip(result, 0, 255).astype(np.uint8)
+    
+    print(f"Result shape after stitching: {result.shape}")
+    return result, matches_img, inliers
+
+@app.route('/stitch', methods=['POST'])
+def stitch_images():
+    files = request.files
+    if len(files) < 4:  # Yêu cầu ít nhất 4 ảnh
+        return jsonify({'error': 'At least four images are required'}), 400
+    
+    images = []
+    for key in files:
+        file = files[key]
+        img = np.array(Image.open(file))
+        if len(img.shape) == 3 and img.shape[2] == 4:
+            img = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
+        elif len(img.shape) == 3:
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        images.append(img)
+    
+    # Ghép tuần tự 4 ảnh
+    result, matches_img, inliers = stitch_two_images(images[0], images[1])
+    for i in range(2, 4):
+        result, _, _ = stitch_two_images(result, images[i])
     
     return jsonify({
-        'matches': image_to_base64(match_img),
+        'matches': image_to_base64(matches_img),
         'panorama': image_to_base64(result),
-        'inliers': int(inliers)
+        'inliers': inliers
     })
 
 if __name__ == '__main__':
