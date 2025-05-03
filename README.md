@@ -25,7 +25,6 @@ The project is divided into three main parts:
 ### Prerequisites
 - Python 3.12.6 or higher.
 - Node.js and npm for the frontend.
-- A LaTeX distribution (e.g., TeX Live) for generating the project report.
 
 ### Steps
 
