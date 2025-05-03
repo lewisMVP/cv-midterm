@@ -61,8 +61,8 @@ The project is divided into three main parts:
 - The Front-end server will be available at http://localhost:5173/cv-midterm/
 
 ### Usagge
-- Backend: Run the backend scripts from backend/app.py to process images and generate results for image filtering, 3D reconstruction, or image stitching.
-- Frontend: Use the React interface to upload images and visualize the outcomes (e.g., filtered images, 3D point clouds, panoramas). Access it at http://localhost:5173 after starting the development server.
+- Back-end: Run the backend scripts from backend/app.py to process images and generate results for image filtering, 3D reconstruction, or image stitching.
+- Front-end: Use the ReactJS interface to upload images and visualize the outcomes (e.g., filtered images, 3D point clouds, panoramas). Access it at http://localhost:5173 after starting the development server.
 
 ## Acknowledgements
 - Thanks to the INS3155 course instructors at VNU-IS for providing the project guidelines.
