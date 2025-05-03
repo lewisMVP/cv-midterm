@@ -5,6 +5,8 @@ import io
 import numpy as np
 import base64
 from flask_cors import CORS
+import time
+from skimage.metrics import structural_similarity as ssim
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": ["http://localhost:5173", "https://lewisMVP.github.io"]}})
@@ -48,30 +50,53 @@ def filter_image():
     
     # Áp dụng các bộ lọc làm mờ theo yêu cầu
     filters = {}
+    psnr_values = {}
+    ssim_values = {}
+    computation_times = {}
     
     # 1. Mean filter
+    start_time = time.time()
     filters['mean'] = cv2.blur(noisy_img, (5, 5))
+    computation_times['mean'] = time.time() - start_time
     
     # 2. Gaussian filter
+    start_time = time.time()
     filters['gaussian'] = cv2.GaussianBlur(noisy_img, (5, 5), 0)
+    computation_times['gaussian'] = time.time() - start_time
     
     # 3. Median filter
+    start_time = time.time()
     filters['median'] = cv2.medianBlur(noisy_img, 5)
+    computation_times['median'] = time.time() - start_time
     
     # 4. Laplacian sharpening (nâng cao biên cạnh)
+    start_time = time.time()
     laplacian = cv2.Laplacian(noisy_img, cv2.CV_64F)
     laplacian = cv2.normalize(laplacian, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
     filters['laplacian'] = cv2.addWeighted(noisy_img, 1.0, laplacian, 0.5, 0)
+    computation_times['laplacian'] = time.time() - start_time
     
-    # Tính PSNR để so sánh hiệu quả giảm nhiễu của từng bộ lọc
-    psnr_values = {}
+    # Tính PSNR và SSIM để so sánh hiệu quả giảm nhiễu của từng bộ lọc
     for key, filtered in filters.items():
+        # Tính PSNR
         mse = np.mean((img_gray - filtered) ** 2)
         if mse == 0:
             psnr_values[key] = 100
         else:
             max_pixel = 255.0
             psnr_values[key] = 20 * np.log10(max_pixel / np.sqrt(mse))
+        
+        # Tính SSIM
+        try:
+            # Hàm compareSSIM trong cv2 được đổi tên thành compare_ssim trong skimage.metrics
+            from skimage.metrics import structural_similarity as ssim
+            ssim_values[key] = ssim(img_gray, filtered, data_range=255)
+        except ImportError:
+            # Nếu không có skimage, thử dùng cv2 (phiên bản cũ)
+            try:
+                ssim_values[key] = cv2.compareSSIM(img_gray, filtered)
+            except:
+                ssim_values[key] = -1  # không tính được SSIM
     
     # Tính biên cạnh bằng Canny để so sánh khả năng bảo toàn biên của từng bộ lọc
     edge_preservation = {}
@@ -100,6 +125,8 @@ def filter_image():
         'noisy': image_to_base64(noisy_display),
         'filtered': {key: image_to_base64(img) for key, img in filters_display.items()},
         'psnr': psnr_values,
+        'ssim': ssim_values,
+        'computation_time': computation_times,
         'edge_preservation': edge_preservation
     })
 

@@ -6,6 +6,8 @@ function ImageFiltering() {
     const [filteredImages, setFilteredImages] = useState({});
     const [psnrValues, setPsnrValues] = useState({});
     const [edgePreservation, setEdgePreservation] = useState({});
+    const [ssimValues, setSsimValues] = useState({});
+    const [computationTimes, setComputationTimes] = useState({});
     const fileInputRef = useRef(null);
 
     const handleImageUpload = async (e) => {
@@ -43,6 +45,8 @@ function ImageFiltering() {
             setNoisyImage(`data:image/png;base64,${data.noisy}`);
             setFilteredImages(data.filtered);
             setPsnrValues(data.psnr || {});
+            setSsimValues(data.ssim || {});
+            setComputationTimes(data.computation_time || {});
             setEdgePreservation(data.edge_preservation || {});
         } catch (error) {
             console.error('Error applying filters:', error);
@@ -90,8 +94,9 @@ function ImageFiltering() {
                             <p className="text-gray-600 font-medium">{formatFilterName(filterType)}</p>
                             <img src={`data:image/png;base64,${imgSrc}`} alt={filterType} className="max-w-full h-auto" />
                             <div className="mt-2 text-sm">
-                                <p className="text-gray-600">PSNR (Noise Reduction): {psnrValues[filterType]?.toFixed(2)} dB</p>
-                                <p className="text-gray-600">Edge Preservation: {(edgePreservation[filterType] || 0).toFixed(3)}</p>
+                                <p className="text-gray-600">PSNR: {psnrValues[filterType]?.toFixed(2)} dB</p>
+                                <p className="text-gray-600">SSIM: {ssimValues[filterType]?.toFixed(3)}</p>
+                                <p className="text-gray-600">Time: {(computationTimes[filterType] * 1000).toFixed(2)} ms</p>
                             </div>
                         </div>
                     ))}
@@ -107,16 +112,20 @@ function ImageFiltering() {
                             <thead className="bg-gray-50">
                                 <tr>
                                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Filter</th>
-                                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Noise Reduction (PSNR)</th>
+                                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">PSNR (dB)</th>
+                                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">SSIM</th>
                                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Edge Preservation</th>
+                                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Time (ms)</th>
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
                                 {Object.keys(psnrValues).map((filter) => (
                                     <tr key={filter}>
                                         <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{formatFilterName(filter)}</td>
-                                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{psnrValues[filter]?.toFixed(2)} dB</td>
+                                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{psnrValues[filter]?.toFixed(2)}</td>
+                                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{ssimValues[filter]?.toFixed(3)}</td>
                                         <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{(edgePreservation[filter] || 0).toFixed(3)}</td>
+                                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{(computationTimes[filter] * 1000).toFixed(2)}</td>
                                     </tr>
                                 ))}
                             </tbody>
