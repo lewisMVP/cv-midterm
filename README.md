@@ -4,6 +4,8 @@ This repository contains the implementation of the INS3155 (Computer Vision) mid
 
 ## Project Overview
 
+![image](https://github.com/user-attachments/assets/fd89096d-765c-42db-b838-bec69494ff55)
+
 The project is divided into three main parts:
 
 - **Part A: Image Filtering** - Implements traditional image filtering techniques (Mean, Gaussian, Median, and Laplacian Sharpening) to reduce Gaussian noise and enhance image quality. Metrics like PSNR and SSIM are used for evaluation.
