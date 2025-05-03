@@ -16,6 +16,7 @@ The project is divided into three main parts:
   - Python 3.12.6 for core processing and scripting.
   - OpenCV (version 4.10.0) for image processing and computer vision tasks.
   - NumPy for numerical computations and array operations.
+  - Flask for building RESTful APIs to handle requests from the frontend, process images, and return results (e.g., filtered images, 3D point clouds, panoramas).
 - **Front-end**: 
   - ReactJS, TailwindCSS for building an interactive user interface.
   - @react-three/fiber for 3D visualization of point clouds and other graphical elements.
