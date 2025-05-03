@@ -55,42 +55,26 @@ function ThreeDReconstruction() {
         
         useEffect(() => {
             if (pointsRef.current && points && points.length > 0) {
-                console.log("Rendering point cloud with", points.length, "points");
+                console.log("Rendering colored point cloud with", points.length, "points");
                 
-                // Create positions array
+                // Create positions and colors arrays
                 const positions = new Float32Array(points.length * 3);
-                
-                // Create colors array
                 const colors = new Float32Array(points.length * 3);
                 
-                // Find z-range for color mapping
-                let minZ = Infinity;
-                let maxZ = -Infinity;
-                
+                // Populate arrays with position and color data
                 for (let i = 0; i < points.length; i++) {
-                    const z = points[i][2];
-                    if (z < minZ) minZ = z;
-                    if (z > maxZ) maxZ = z;
+                    // Position (first 3 values are x,y,z)
+                    positions[i * 3] = points[i][0];     // x
+                    positions[i * 3 + 1] = points[i][1]; // y
+                    positions[i * 3 + 2] = points[i][2]; // z
+                    
+                    // Color (next 3 values are r,g,b)
+                    colors[i * 3] = points[i][3] / 255.0;     // r
+                    colors[i * 3 + 1] = points[i][4] / 255.0; // g
+                    colors[i * 3 + 2] = points[i][5] / 255.0; // b
                 }
                 
-                // Populate arrays
-                for (let i = 0; i < points.length; i++) {
-                    // Position
-                    positions[i * 3] = points[i][0];
-                    positions[i * 3 + 1] = points[i][1];
-                    positions[i * 3 + 2] = points[i][2];
-                    
-                    // Color based on depth (normalized between 0-1)
-                    const normalizedZ = (points[i][2] - minZ) / (maxZ - minZ || 1);
-                    
-                    // Use grayscale coloring similar to matplotlib
-                    const colorValue = 0.2 + normalizedZ * 0.8; // Brighter for closer points
-                    colors[i * 3] = colorValue;     // R
-                    colors[i * 3 + 1] = colorValue; // G
-                    colors[i * 3 + 2] = colorValue; // B
-                }
-                
-                // Update geometry with new positions and colors
+                // Update geometry
                 pointsRef.current.geometry.setAttribute(
                     'position', 
                     new THREE.BufferAttribute(positions, 3)
@@ -122,11 +106,10 @@ function ThreeDReconstruction() {
                     />
                 </bufferGeometry>
                 <pointsMaterial
-                    size={0.1} // Much smaller point size
+                    size={0.05}
                     sizeAttenuation={true}
                     vertexColors={true}
                     transparent={false}
-                    alphaTest={0.5}
                 />
             </points>
         );
