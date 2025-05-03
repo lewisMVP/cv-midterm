@@ -17,7 +17,7 @@ The project is divided into three main parts:
   - OpenCV (version 4.10.0) for image processing and computer vision tasks.
   - NumPy for numerical computations and array operations.
 - **Front-end**: 
-  - React for building an interactive user interface.
+  - ReactJS, TailwindCSS for building an interactive user interface.
   - @react-three/fiber for 3D visualization of point clouds and other graphical elements.
     
 ## Installation Guide
