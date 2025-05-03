@@ -18,14 +18,14 @@ The project is divided into three main parts:
   - NumPy for numerical computations and array operations.
   - Flask for building RESTful APIs to handle requests from the frontend, process images, and return results (e.g., filtered images, 3D point clouds, panoramas).
 - **Front-end**: 
-  - ReactJS, TailwindCSS for building an interactive user interface.
+  - React.JS, TailwindCSS for building an interactive user interface.
   - @react-three/fiber for 3D visualization of point clouds and other graphical elements.
     
 ## Installation Guide
 
 ### Prerequisites
 - Python 3.12.6 or higher.
-- Node.js and npm for the frontend.
+- Node.js and npm for the Front-end.
 
 ### Steps
 
