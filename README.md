@@ -1,81 +1,39 @@
-INS3155 Computer Vision Midterm Project
+# INS3155 Computer Vision Midterm Project
+
 This repository contains the implementation of the INS3155 (Computer Vision) midterm project at VNU-IS, Spring 2025. The project focuses on three key tasks: image filtering, 3D reconstruction from stereo images, and image stitching to create panoramic views. It adheres to the guideline of using only traditional image processing methods, avoiding deep learning models or pretrained networks.
-Technologies Used
 
-Backend: 
-Python 3.12.6 for core processing and scripting.
-OpenCV (version 4.10.0) for image processing and computer vision tasks.
-NumPy for numerical computations and array operations.
+## Project Overview
 
+The project is divided into three main parts:
 
-Frontend: 
-React for building an interactive user interface.
-@react-three/fiber for 3D visualization of point clouds and other graphical elements.
+- **Part A: Image Filtering** - Implements traditional image filtering techniques (Mean, Gaussian, Median, and Laplacian Sharpening) to reduce Gaussian noise and enhance image quality. Metrics like PSNR and SSIM are used for evaluation.
+- **Part B: 3D Reconstruction** - Uses stereo image pairs to compute disparity maps with StereoBM and StereoSGBM, followed by 3D point cloud reconstruction. The fundamental matrix and epipolar lines validate the stereo geometry.
+- **Part C: Image Stitching** - Stitches multiple images into a panorama using ORB feature detection, homography estimation with RANSAC, and linear alpha blending for seamless transitions.
 
+The source code is available in this repository, with detailed documentation in the `report/main.pdf`.
 
+## Technologies Used
 
-Installation Guide
-Prerequisites
+- **Backend**: 
+  - Python 3.12.6 for core processing and scripting.
+  - OpenCV (version 4.10.0) for image processing and computer vision tasks.
+  - NumPy for numerical computations and array operations.
+- **Frontend**: 
+  - React for building an interactive user interface.
+  - @react-three/fiber for 3D visualization of point clouds and other graphical elements.
+- **Documentation**:
+  - LaTeX for generating the project report (`report/main.tex`).
 
-Python 3.12.6 or higher.
-Node.js and npm for the frontend.
-A LaTeX distribution (e.g., TeX Live) for generating reports.
+## Installation Guide
 
-Steps
+### Prerequisites
+- Python 3.12.6 or higher.
+- Node.js and npm for the frontend.
+- A LaTeX distribution (e.g., TeX Live) for generating the project report.
 
-Clone the Repository
-git clone https://github.com/lewisMVP/cv-midterm.git
-cd cv-midterm
+### Steps
 
-
-Set Up the Backend
-
-Create a virtual environment and activate it:python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-
-Install the required Python packages:pip install -r backend/requirements.txt
-
-
-Ensure OpenCV is installed correctly (version 4.10.0 is recommended).
-
-
-Set Up the Frontend
-
-Navigate to the frontend directory:cd frontend
-
-
-Install dependencies:npm install
-
-
-Start the development server:npm start
-
-
-The frontend will be available at http://localhost:3000.
-
-
-Generate the Report (Optional)
-
-Navigate to the report directory:cd report
-
-
-Compile the LaTeX document:latexmk -pdf main.tex
-
-
-View the generated main.pdf for the project report.
-
-
-
-Usage
-
-Run the backend scripts from backend/app.py to process images and generate results.
-Use the frontend interface to upload images and visualize the outcomes (e.g., filtered images, 3D point clouds, panoramas).
-Modify the source code or configuration files in backend/ and frontend/ as needed.
-
-Notes
-
-Replace placeholder image paths (e.g., path/to/image.jpg) in the code with actual file locations.
-Ensure sufficient memory and GPU support for 3D reconstruction tasks if available.
-For issues, refer to the OpenCV documentation or the project issue tracker.
-
-Happy coding and exploring computer vision!
+1. **Clone the Repository**
+   ```bash
+   git clone https://github.com/lewisMVP/cv-midterm.git
+   cd cv-midterm
