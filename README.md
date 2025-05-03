@@ -10,8 +10,6 @@ The project is divided into three main parts:
 - **Part B: 3D Reconstruction** - Uses stereo image pairs to compute disparity maps with StereoBM and StereoSGBM, followed by 3D point cloud reconstruction. The fundamental matrix and epipolar lines validate the stereo geometry.
 - **Part C: Image Stitching** - Stitches multiple images into a panorama using ORB feature detection, homography estimation with RANSAC, and linear alpha blending for seamless transitions.
 
-The source code is available in this repository, with detailed documentation in the `report/main.pdf`.
-
 ## Technologies Used
 
 - **Back-end**: 
@@ -35,3 +33,37 @@ The source code is available in this repository, with detailed documentation in 
    ```bash
    git clone https://github.com/lewisMVP/cv-midterm.git
    cd cv-midterm
+2. **Set Up the Back-end**
+- Create a virtual environment and activate it:
+  ```bash
+  python -m venv venv
+  source venv/bin/activate  # On Windows: venv\Scripts\activate
+- Install the required Python packages:
+  ```bash
+  pip install -r backend/requirements.txt
+- Ensure OpenCV is installed correctly (version 4.10.0 is recommended).
+- Navigate to the backend directory:
+  ```bash
+  cd backend
+- Start the Back-end server:
+  ```bash
+  python app.py
+3. **Set Up the Front-end**
+- Navigate to the frontend directory:
+  ```bash
+  cd frontend
+- Install dependences:
+  ```bash
+  npm install
+- Start the development server:
+  ```bash
+  npm run dev
+- The Front-end server will be available at http://localhost:5173/cv-midterm/
+
+### Usagge
+- Backend: Run the backend scripts from backend/app.py to process images and generate results for image filtering, 3D reconstruction, or image stitching.
+- Frontend: Use the React interface to upload images and visualize the outcomes (e.g., filtered images, 3D point clouds, panoramas). Access it at http://localhost:5173 after starting the development server.
+
+## Acknowledgements
+- Thanks to the INS3155 course instructors at VNU-IS for providing the project guidelines.
+- OpenCV documentation and community for valuable resources.
