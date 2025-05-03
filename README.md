@@ -14,16 +14,14 @@ The source code is available in this repository, with detailed documentation in 
 
 ## Technologies Used
 
-- **Backend**: 
+- **Back-end**: 
   - Python 3.12.6 for core processing and scripting.
   - OpenCV (version 4.10.0) for image processing and computer vision tasks.
   - NumPy for numerical computations and array operations.
-- **Frontend**: 
+- **Front-end**: 
   - React for building an interactive user interface.
   - @react-three/fiber for 3D visualization of point clouds and other graphical elements.
-- **Documentation**:
-  - LaTeX for generating the project report (`report/main.tex`).
-
+    
 ## Installation Guide
 
 ### Prerequisites
