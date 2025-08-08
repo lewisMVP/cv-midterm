@@ -9,6 +9,7 @@ This repository contains the implementation of the INS3155 (Computer Vision) mid
 The project is divided into three main parts:
 
 - **Part A: Image Filtering** - Implements traditional image filtering techniques (Mean, Gaussian, Median, and Laplacian Sharpening) to reduce Gaussian noise and enhance image quality. Metrics like PSNR and SSIM are used for evaluation.
+  <img width="309" height="695" alt="image" src="https://github.com/user-attachments/assets/458c2b61-30eb-4569-bc05-2b17858f318a" />
 - **Part B: 3D Reconstruction** - Uses stereo image pairs to compute disparity maps with StereoBM and StereoSGBM, followed by 3D point cloud reconstruction. The fundamental matrix and epipolar lines validate the stereo geometry.
 - **Part C: Image Stitching** - Stitches multiple images into a panorama using ORB feature detection, homography estimation with RANSAC, and linear alpha blending for seamless transitions.
 
