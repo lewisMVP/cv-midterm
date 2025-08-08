@@ -17,7 +17,9 @@ The project is divided into three main parts:
   <img width="1240" height="860" alt="image" src="https://github.com/user-attachments/assets/37e38a08-23de-44ee-88e5-9885b47a1116"/>
   <img width="1242" height="898" alt="image" src="https://github.com/user-attachments/assets/aeb64a5e-1885-4b4b-b61d-20ccb2867b38" />
 - **Part C: Image Stitching** - Stitches multiple images into a panorama using ORB feature detection, homography estimation with RANSAC, and linear alpha blending for seamless transitions.
-  <img width="1248" height="510" alt="image" src="https://github.com/user-attachments/assets/c66e5e36-1efe-480e-8202-feaef6ec8368" />
+  <img width="1250" height="680" alt="image" src="https://github.com/user-attachments/assets/b462e768-18f3-4468-b075-5c823d2a1f73"/>
+  <img width="1233" height="943" alt="image" src="https://github.com/user-attachments/assets/d76a0ba4-4ac3-4c0c-87e1-25a6f9f126f5"/>
+  <img width="1230" height="943" alt="image" src="https://github.com/user-attachments/assets/1c36a747-ed82-44e0-8dab-70be84740acd"/>
 
 ## Technologies Used
 
