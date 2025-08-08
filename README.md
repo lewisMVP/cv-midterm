@@ -4,7 +4,7 @@ This repository contains the implementation of the INS3155 (Computer Vision) mid
 
 ## Project Overview
 
-![image](https://github.com/user-attachments/assets/fd89096d-765c-42db-b838-bec69494ff55)
+<img width="1916" height="946" alt="image" src="https://github.com/user-attachments/assets/e4568bf0-ffd6-4216-b9ad-d2172f6386bd" />
 
 The project is divided into three main parts:
 
