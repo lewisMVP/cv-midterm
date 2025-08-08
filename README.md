@@ -12,7 +12,12 @@ The project is divided into three main parts:
   <img width="838" height="882" alt="image" src="https://github.com/user-attachments/assets/03f48d50-fef1-44e6-873b-ee74d7cf5966"/>
   <img width="1241" height="368" alt="image" src="https://github.com/user-attachments/assets/93fd430f-0765-406e-99ff-7ff52a00f278"/>
 - **Part B: 3D Reconstruction** - Uses stereo image pairs to compute disparity maps with StereoBM and StereoSGBM, followed by 3D point cloud reconstruction. The fundamental matrix and epipolar lines validate the stereo geometry.
+  <img width="1283" height="824" alt="image" src="https://github.com/user-attachments/assets/58f7e2f7-a868-4584-9995-1afab6d70e12"/>
+  <img width="1239" height="712" alt="image" src="https://github.com/user-attachments/assets/a3fba501-c3d1-4c50-9e4a-14417154a74f"/>
+  <img width="1240" height="860" alt="image" src="https://github.com/user-attachments/assets/37e38a08-23de-44ee-88e5-9885b47a1116"/>
+  <img width="1242" height="898" alt="image" src="https://github.com/user-attachments/assets/aeb64a5e-1885-4b4b-b61d-20ccb2867b38" />
 - **Part C: Image Stitching** - Stitches multiple images into a panorama using ORB feature detection, homography estimation with RANSAC, and linear alpha blending for seamless transitions.
+  <img width="1248" height="510" alt="image" src="https://github.com/user-attachments/assets/c66e5e36-1efe-480e-8202-feaef6ec8368" />
 
 ## Technologies Used
 
