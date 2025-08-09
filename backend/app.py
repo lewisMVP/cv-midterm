@@ -13,6 +13,7 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": [
     "http://localhost:5173", 
     "https://lewisMVP.github.io",
+    "https://lewismvp.github.io",
     "https://cv-midterm.onrender.com"  # Thêm domain production
 ]}})
 
@@ -510,6 +511,16 @@ def stitch_images():
             elif len(img.shape) == 3 and img.shape[2] == 4:  # Xử lý ảnh RGBA
                 img = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
             
+            images.append(img)
+        except Exception as e:
+            return jsonify({'error': f'Failed to process image {key}: {str(e)}'}), 400
+    
+    images = []
+    for key in sorted(files.keys()):
+        file = files[key]
+        try:
+            img = np.array(Image.open(file))
+            # Xử lý định dạng ảnh...
             images.append(img)
         except Exception as e:
             return jsonify({'error': f'Failed to process image {key}: {str(e)}'}), 400
