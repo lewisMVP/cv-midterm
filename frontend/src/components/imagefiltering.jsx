@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, Sparkles, Clock, BarChart3, Eye, Download, X, Info } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.PROD 
-  ? 'https://cv-midterm.onrender.com'  // Thay bằng tên backend thực tế
+  ? 'https://cv-midterm.onrender.com' 
   : 'http://localhost:5000';
 
 function ImageFiltering() {
