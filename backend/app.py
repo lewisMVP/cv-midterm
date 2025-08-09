@@ -340,9 +340,19 @@ def reconstruct_3d():
 
 # Part C: Image Stitching
 def stitch_two_images(img1, img2):
-    # Đảm bảo ảnh cùng kiểu dữ liệu và kích thước phù hợp
-    img1 = cv2.resize(img1, (0, 0), fx=1.0, fy=1.0)
-    img2 = cv2.resize(img2, (0, 0), fx=1.0, fy=1.0)
+    # Giảm kích thước nếu quá lớn để tiết kiệm memory
+    max_dimension = 1000
+    h1, w1 = img1.shape[:2]
+    h2, w2 = img2.shape[:2]
+    
+    scale_factor = 1.0
+    if max(h1, w1, h2, w2) > max_dimension:
+        scale_factor = max_dimension / max(h1, w1, h2, w2)
+        new_size1 = (int(w1 * scale_factor), int(h1 * scale_factor))
+        new_size2 = (int(w2 * scale_factor), int(h2 * scale_factor))
+        
+        img1 = cv2.resize(img1, new_size1)
+        img2 = cv2.resize(img2, new_size2)
     
     # Chuyển ảnh sang grayscale cho việc tìm đặc trưng
     gray1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
@@ -489,22 +499,43 @@ def stitch_two_images(img1, img2):
         # Nếu không có vùng chồng lấp, kết hợp cả hai ảnh
         result = np.where(mask2[:, :, np.newaxis] > 0, result, warped_img)
     
+    # Cuối function, scale lại kết quả nếu cần
+    if scale_factor != 1.0:
+        h, w = result.shape[:2]
+        original_size = (int(w / scale_factor), int(h / scale_factor))
+        result = cv2.resize(result, original_size)
+    
     return result, matches_img, inliers
 
 @app.route('/stitch', methods=['POST'])
 def stitch_images():
+    import gc  # Thêm import
+    
     files = request.files
     if len(files) < 4:
         return jsonify({'error': 'At least four images are required'}), 400
     
-    # Đọc và xử lý các ảnh
+    # Đọc và xử lý các ảnh - THÊM RESIZE ĐỂ TIẾT KIỆM MEMORY
     images = []
     for key in sorted(files.keys()):
         file = files[key]
         try:
-            # Đọc ảnh đúng cách để đảm bảo màu sắc chính xác
+            # Resize ảnh xuống để tiết kiệm memory
             img_pil = Image.open(file)
+            
+            # Giảm kích thước xuống 70% để tiết kiệm memory
+            width, height = img_pil.size
+            max_dimension = 1200  # Giới hạn kích thước tối đa
+            
+            if max(width, height) > max_dimension:
+                scale = max_dimension / max(width, height)
+                new_size = (int(width * scale), int(height * scale))
+                img_pil = img_pil.resize(new_size, Image.Resampling.LANCZOS)
+            
             img = np.array(img_pil)
+            
+            # Giải phóng PIL image ngay
+            del img_pil
             
             # Chuyển đổi từ RGB sang BGR nếu cần (cho OpenCV)
             if len(img.shape) == 3 and img.shape[2] == 3:
@@ -516,6 +547,7 @@ def stitch_images():
         except Exception as e:
             return jsonify({'error': f'Failed to process image {key}: {str(e)}'}), 400
     
+    # GIỮ NGUYÊN ĐOẠN NÀY - KHÔNG XÓA (để xử lý màu)
     images = []
     for key in sorted(files.keys()):
         file = files[key]
@@ -541,11 +573,18 @@ def stitch_images():
         all_inliers.append(inliers)
     
     # Thực hiện ghép panorama từ tất cả các ảnh
-    result = images[0]
+    result = images[0].copy()
     try:
         for i in range(1, len(images)):
             temp_result, _, _ = stitch_two_images(result, images[i])
+            
+            # Giải phóng memory của result cũ
+            del result
             result = temp_result
+            
+            # Force garbage collection
+            gc.collect()
+            
     except Exception as e:
         print(f"Error during stitching: {str(e)}")
         if not all_matches_imgs:
