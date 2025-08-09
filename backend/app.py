@@ -514,18 +514,6 @@ def stitch_images():
         except Exception as e:
             return jsonify({'error': f'Failed to process image {key}: {str(e)}'}), 400
     
-    # Phần code còn lại giữ nguyên
-    # Đọc và xử lý các ảnh
-    images = []
-    for key in sorted(files.keys()):
-        file = files[key]
-        try:
-            img = np.array(Image.open(file))
-            # Xử lý định dạng ảnh...
-            images.append(img)
-        except Exception as e:
-            return jsonify({'error': f'Failed to process image {key}: {str(e)}'}), 400
-    
     if len(images) < 4:
         return jsonify({'error': 'At least four valid images are required'}), 400
     
