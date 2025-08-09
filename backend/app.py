@@ -10,7 +10,11 @@ from skimage.metrics import structural_similarity as ssim
 import os
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": ["http://localhost:5173", "https://lewisMVP.github.io"]}})
+CORS(app, resources={r"/*": {"origins": [
+    "http://localhost:5173", 
+    "https://lewisMVP.github.io",
+    "https://cv-midterm.onrender.com"  # Thêm domain production
+]}})
 
 def image_to_base64(img):
     # Không chuyển đổi nếu ảnh đã là RGB hoặc ảnh grayscale
@@ -582,4 +586,5 @@ def stitch_images():
     })
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get('PORT', 5000))  # Render sẽ cung cấp PORT
+    app.run(host='0.0.0.0', port=port, debug=False)  # Phải bind 0.0.0.0

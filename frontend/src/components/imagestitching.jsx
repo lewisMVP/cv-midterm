@@ -2,6 +2,10 @@ import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, Grid3x3, Link2, Maximize, Download, X, Info, Eye, ImagePlus, Sparkles } from 'lucide-react';
 
+const API_BASE_URL = import.meta.env.PROD 
+  ? 'https://cv-midterm.onrender.com'
+  : 'http://localhost:5000';
+
 function ImageStitching() {
     const [matchesImage, setMatchesImage] = useState(null);
     const [panorama, setPanorama] = useState(null);
@@ -51,7 +55,7 @@ function ImageStitching() {
         }
 
         try {
-            const response = await fetch('http://localhost:5000/stitch', {
+            const response = await fetch(`${API_BASE_URL}/stitch`, {
                 method: 'POST',
                 body: formData,
             });

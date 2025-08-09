@@ -2,6 +2,10 @@ import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, Sparkles, Clock, BarChart3, Eye, Download, X, Info } from 'lucide-react';
 
+const API_BASE_URL = import.meta.env.PROD 
+  ? 'https://cv-midterm.onrender.com'  // Thay bằng tên backend thực tế
+  : 'http://localhost:5000';
+
 function ImageFiltering() {
     const [originalImage, setOriginalImage] = useState(null);
     const [noisyImage, setNoisyImage] = useState(null);
@@ -38,7 +42,7 @@ function ImageFiltering() {
         formData.append('image', file);
 
         try {
-            const response = await fetch('http://localhost:5000/filter', {
+            const response = await fetch(`${API_BASE_URL}/filter`, {
                 method: 'POST',
                 body: formData,
             });

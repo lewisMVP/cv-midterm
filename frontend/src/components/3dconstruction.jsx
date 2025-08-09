@@ -5,6 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, Layers, Settings, Maximize2, Download, Play, Pause, RotateCcw, Info, Eye, Cpu } from 'lucide-react';
 import * as THREE from 'three';
 
+const API_BASE_URL = import.meta.env.PROD 
+  ? 'https://cv-midterm.onrender.com' 
+  : 'http://localhost:5000';
+
 function ThreeDReconstruction() {
     const [disparityImage, setDisparityImage] = useState(null);
     const [leftEpipolarImage, setLeftEpipolarImage] = useState(null);
@@ -50,7 +54,7 @@ function ThreeDReconstruction() {
         formData.append('method', method);
 
         try {
-            const response = await fetch('http://localhost:5000/3dconstruction', {
+            const response = await fetch(`${API_BASE_URL}/3dconstruction`, {
                 method: 'POST',
                 body: formData,
             });
