@@ -14,6 +14,7 @@ CORS(app, resources={r"/*": {"origins": [
     "http://localhost:5173", 
     "https://lewisMVP.github.io",
     "https://lewismvp.github.io",
+    "https://*.github.io",
     "https://cv-midterm.onrender.com"  # Thêm domain production
 ]}})
 
